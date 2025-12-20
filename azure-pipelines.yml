@@ -11,6 +11,7 @@ stages:
         displayName: precheck
         steps:
         - task: TerraformTask@5
+          displayName: Terraform init
           inputs:
             provider: 'azurerm'
             command: 'init'
