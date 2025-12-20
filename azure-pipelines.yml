@@ -2,6 +2,7 @@ trigger:
 - main
 
 pool: myagent
+
 stages:
   - stage: 
     displayName: Build
@@ -17,7 +18,7 @@ stages:
             provider: 'azurerm'
             command: 'init'
             workingDirectory: '$(System.DefaultWorkingDirectory)infracode-repo/env/dev'
-            backendServiceArm: 'myconnection1'
+            backendServiceArm: 'myconnection'
             backendAzureRmStorageAccountName: 'maheshstg12'
             backendAzureRmContainerName: 'mahesh'
             backendAzureRmKey: 'tfstate'
