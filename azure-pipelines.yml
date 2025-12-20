@@ -1,0 +1,21 @@
+trigger:
+- main
+
+pool: Default
+stages:
+  - stage: 
+    displayName: Build
+    jobs:
+      - job: precheck
+        displayName: precheck
+        steps:
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(System.DefaultWorkingDirectory)infracode-repo/env/'
+            backendServiceArm: 'myconnection1'
+            backendAzureRmStorageAccountName: 'maheshstg12'
+            backendAzureRmContainerName: 'mahesh'
+            backendAzureRmKey: 'tfstate'
+  
