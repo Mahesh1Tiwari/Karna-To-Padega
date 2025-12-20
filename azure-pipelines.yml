@@ -1,7 +1,7 @@
 trigger:
 - main
 
-pool: myagent
+pool: Default
 
 stages:
   - stage: 
@@ -10,9 +10,6 @@ stages:
       - job: precheck
         displayName: precheck
         steps:
-        - task: TerraformInstaller@1
-          inputs:
-            terraformVersion: 'latest'
         - task: TerraformTask@5
           inputs:
             provider: 'azurerm'
@@ -21,5 +18,5 @@ stages:
             backendServiceArm: 'myconnection'
             backendAzureRmStorageAccountName: 'maheshstg12'
             backendAzureRmContainerName: 'mahesh'
-            backendAzureRmKey: 'tfstate'
+            backendAzureRmKey: 'dev.tfstate'
   
