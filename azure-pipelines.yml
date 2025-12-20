@@ -24,6 +24,7 @@ stages:
             backendAzureRmContainerName: 'mahesh'
             backendAzureRmKey: 'dev.tfstate'
         - task: TerraformTask@5
+          displayName: Terraform plan
           inputs:
             provider: 'azurerm'
             command: 'plan'
