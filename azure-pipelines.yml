@@ -1,7 +1,7 @@
 trigger:
 - main
 
-pool: Mera Agent
+pool: myagent
 stages:
   - stage: 
     displayName: Build
