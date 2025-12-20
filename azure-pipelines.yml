@@ -16,6 +16,7 @@ stages:
             provider: 'azurerm'
             command: 'init'
             workingDirectory: '$(System.DefaultWorkingDirectory)/infracode-Repo/env/dev'
+            backendAzureRmUseEntraIdForAuthentication: false
             backendServiceArm: 'myconnection'
             backendAzureRmStorageAccountName: 'maheshstg12'
             backendAzureRmContainerName: 'mahesh'
