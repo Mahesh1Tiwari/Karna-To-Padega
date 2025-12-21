@@ -54,4 +54,5 @@ stages:
         target: '$(System.DefaultWorkingDirectory)/env/dev'
         severity: 'HIGH,CRITICAL'
         version: 'latest'
- 
+ # ================= MANUAL VALIDATION STAGE =================
+
