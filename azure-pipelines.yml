@@ -79,6 +79,12 @@ stages:
     - job: Apply
       displayName: "Terraform ApplyJob"
       steps:
-      - script: terraform apply -auto-approve
-        displayName: "Run Terraform Apply"
+
+      - task: TerraformTask@5
+        inputs:
+          provider: 'azurerm'
+          command: 'apply'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+          commandOptions: '--approve'
+          environmentServiceNameAzureRM: 'myconnection'
 
