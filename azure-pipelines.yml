@@ -84,7 +84,6 @@ stages:
           provider: 'azurerm'
           command: 'init'
           workingDirectory: '$(System.DefaultWorkingDirectory)/enb/dev'
-          commandOptions: 'plan'
           backendServiceArm: 'myconnection'
           backendAzureRmResourceGroupName: 'rg-mahesh-11'
           backendAzureRmStorageAccountName: 'maheshstg12'
