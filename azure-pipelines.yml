@@ -50,7 +50,7 @@ stages:
         version: 'v1.26.0'
     - task: trivy@2
       inputs:
-        type: terraform
+        type: filesystem
         target: '$(System.DefaultWorkingDirectory)/env/dev'
         severity: 'HIGH,CRITICAL'
         version: 'latest'
