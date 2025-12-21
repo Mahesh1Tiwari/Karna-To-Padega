@@ -51,8 +51,7 @@ stages:
     - task: trivy@2
       inputs:
         type: terraform
-        scanDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+        target: '$(System.DefaultWorkingDirectory)/env/dev'
         severity: 'HIGH,CRITICAL'
-        
         version: 'latest'
  
