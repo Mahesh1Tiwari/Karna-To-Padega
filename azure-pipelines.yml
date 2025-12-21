@@ -4,30 +4,50 @@ trigger:
 pool: Default
 
 stages:
-  - stage: 
-    displayName: Build
-    jobs:
-      - job: precheck
-        displayName: precheck
-        steps:
-        
-        - task: TerraformTask@5
-          displayName: Terraform init
-          inputs:
-            provider: 'azurerm'
-            command: 'init'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
-            backendAzureRmUseEntraIdForAuthentication: false
-            backendServiceArm: 'myconnection'
-            backendAzureRmResourceGroupName: 'rg-mahesh-11'
-            backendAzureRmStorageAccountName: 'maheshstg12'
-            backendAzureRmContainerName: 'mahesh'
-            backendAzureRmKey: 'dev.tfstate'
-        - task: TerraformTask@5
-          displayName: Terraform plan
-          inputs:
-            provider: 'azurerm'
-            command: 'plan'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
-            environmentServiceNameAzureRM: 'myconnection'
-   
+
+# ================= BUILD / PRECHECK STAGE =================
+- stage: Build
+  displayName: "Terraform Precheck"
+  jobs:
+  - job: precheck
+    displayName: "Terraform Init & Plan"
+    steps:
+
+    - task: TerraformTask@5
+      displayName: "Terraform Init"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+        backendAzureRmUseEntraIdForAuthentication: false
+        backendServiceArm: 'myconnection'
+        backendAzureRmResourceGroupName: 'rg-mahesh-11'
+        backendAzureRmStorageAccountName: 'maheshstg12'
+        backendAzureRmContainerName: 'mahesh'
+        backendAzureRmKey: 'dev.tfstate'
+
+    - task: TerraformTask@5
+      displayName: "Terraform Plan"
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+        environmentServiceNameAzureRM: 'myconnection'
+
+
+# ================= SCANNING STAGE =================
+- stage: Scanning
+  displayName: "Security Scanning"
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: tfscan
+    displayName: "Terraform Security Scan"
+    steps:
+
+    - script: |
+        echo "Running terraform security scan..."
+        echo "Example: tfsec / checkov will run here"
+      displayName: "Run IaC Scan"
+
+ 
