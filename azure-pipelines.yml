@@ -79,12 +79,22 @@ stages:
     - job: Apply
       displayName: "Terraform ApplyJob"
       steps:
-
+      - task: TerraformTask@5
+        inputs:
+          provider: 'azurerm'
+          command: 'init'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/enb/dev'
+          commandOptions: 'plan'
+          backendServiceArm: 'myconnection'
+          backendAzureRmResourceGroupName: 'rg-mahesh-01'
+          backendAzureRmStorageAccountName: 'maheshstg12'
+          backendAzureRmContainerName: 'mahesh'
+          backendAzureRmKey: 'dev.tfstate'
       - task: TerraformTask@5
         inputs:
           provider: 'azurerm'
           command: 'apply'
           workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
-          commandOptions: '--approve'
+          commandOptions: '-approve'
           environmentServiceNameAzureRM: 'myconnection'
 
