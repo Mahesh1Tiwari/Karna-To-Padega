@@ -71,4 +71,14 @@ stages:
             inputs:
               notifyUsers: 'mahesh1tiwari'  # DevOps username
               instructions: 'Please approve this deployment before continuing.'
+- stage: terraformApply
+  dependsOn: Approval
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+  jobs:
+    - job: Apply
+      displayName: "Terraform ApplyJob"
+      steps:
+      - script: terraform apply -auto-approve
+        displayName: "Run Terraform Apply"
 
