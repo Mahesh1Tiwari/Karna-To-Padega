@@ -48,5 +48,7 @@ stages:
     - task: tfsec@1
       inputs:
         version: 'v1.26.0'
-
+    - task: trivy@2
+      inputs:
+        version: 'latest'
  
