@@ -54,4 +54,21 @@ stages:
         target: '$(System.DefaultWorkingDirectory)/env/dev'
         severity: 'HIGH,CRITICAL'
         version: 'latest'
- 
+- stage: Approval
+  displayName: "Manual Approval Stage"
+  dependsOn: Scanning
+  condition: succeeded()
+  jobs:
+  - deployment: ManualApproval    # deployment job
+    displayName: "Wait for Approval"
+    environment: dev              # existing environment
+    pool: server                  # runs on Azure DevOps server
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: ManualValidation@0   # latest supported version
+            inputs:
+              notifyUsers: 'mahesh1tiwari'  # DevOps username
+              instructions: 'Please approve this deployment before continuing.'
+
