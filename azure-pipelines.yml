@@ -6,6 +6,7 @@ pool: Default
 stages:
 
 # ================= BUILD / PRECHECK STAGE =================
+# ================= BUILD / PRECHECK STAGE =================
 - stage: Build
   displayName: "Terraform Precheck"
   jobs:
@@ -34,21 +35,27 @@ stages:
         commandOptions: '-out=tfplan'
         environmentServiceNameAzureRM: 'myconnection'
 
-    # ===== INFRACOST INSTALL =====
-    - script: |
-        curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+    # ================= INFRACOST INSTALL (WINDOWS) =================
+    - powershell: |
+        Write-Host "Installing Infracost..."
+        Invoke-WebRequest `
+          -Uri https://infracost.io/downloads/latest/infracost-windows-amd64.zip `
+          -OutFile infracost.zip
+        Expand-Archive infracost.zip -DestinationPath infracost -Force
+        Copy-Item infracost\infracost.exe "C:\Windows\System32\infracost.exe" -Force
         infracost --version
-      displayName: "Install Infracost"
+      displayName: "Install Infracost (Windows)"
 
-    # ===== INFRACOST COST ESTIMATION =====
-    - script: |
-        infracost breakdown \
-          --path $(System.DefaultWorkingDirectory)/env/dev \
-          --terraform-plan-file $(System.DefaultWorkingDirectory)/env/dev/tfplan \
+    # ================= INFRACOST COST ESTIMATION =================
+    - powershell: |
+        infracost breakdown `
+          --path "$(System.DefaultWorkingDirectory)/env/dev" `
+          --terraform-plan-file "$(System.DefaultWorkingDirectory)/env/dev/tfplan" `
           --format table
       displayName: "Infracost Cost Estimation"
       env:
         INFRACOST_API_KEY: $(INFRACOST_API_KEY)
+
 
 
 # ================= SCANNING STAGE =================
