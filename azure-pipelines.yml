@@ -44,7 +44,7 @@ stages:
         commandOptions: '-out=tfplan'
         environmentServiceNameAzureRM: 'myconnection'
 
-    # ---------- Install Infracost (FIXED) ----------
+    # ---------- Install Infracost ----------
     - powershell: |
         Write-Host "Installing Infracost..."
         $dir = "$(Agent.TempDirectory)\infracost"
