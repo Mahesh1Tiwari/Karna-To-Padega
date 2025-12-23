@@ -150,6 +150,95 @@ stages:
         Invoke-RestMethod -Method Post `
             -Uri "https://$workspaceId.ods.opinsights.azure.com/api/logs?api-version=2016-04-01" `
             -Body $body `
-            -Headers $
+            -Headers $headers `
+            -ContentType "application/json"
+      displayName: "Send Security Scan Logs to Azure Monitor"
 
+# =========================================================
+# MANUAL APPROVAL STAGE
+# =========================================================
+- stage: Approval
+  displayName: "Manual Approval Stage"
+  dependsOn: Scanning
+  condition: succeeded()
+  jobs:
+  - deployment: ManualApproval
+    displayName: "Wait for Approval"
+    environment: dev
+    pool: server
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: ManualValidation@0
+            inputs:
+              notifyUsers: 'mahesh1tiwari'
+              instructions: 'Please approve Terraform Apply to continue.'
 
+# =========================================================
+# APPLY STAGE (MAIN BRANCH ONLY)
+# =========================================================
+- stage: TerraformApply
+  displayName: "Terraform Apply"
+  dependsOn: Approval
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+  jobs:
+  - job: Apply
+    displayName: "Terraform Apply Job"
+    steps:
+
+    - task: TerraformTask@5
+      displayName: "Terraform Init (Apply)"
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_DIR)'
+        backendServiceArm: 'myconnection'
+        backendAzureRmResourceGroupName: 'rg-mahesh-11'
+        backendAzureRmStorageAccountName: 'maheshstg12'
+        backendAzureRmContainerName: 'mahesh'
+        backendAzureRmKey: 'dev.tfstate'
+
+    - task: TerraformTask@5
+      displayName: "Terraform Apply"
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(TF_DIR)'
+        commandOptions: '-auto-approve'
+        environmentServiceNameAzureRM: 'myconnection'
+
+    # ---------- Send Apply Logs to Azure Monitor ----------
+    - powershell: |
+        $workspaceId = "$(LOG_ANALYTICS_WORKSPACE_ID)"
+        $sharedKey = "$(LOG_ANALYTICS_SHARED_KEY)"
+        $logType = "$(LOG_TYPE)"
+
+        $body = @{
+            Stage = "Terraform Apply"
+            Branch = "$(Build.SourceBranchName)"
+            Status = "$(Agent.JobStatus)"
+            Timestamp = (Get-Date).ToString("o")
+        } | ConvertTo-Json
+
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+        $date = (Get-Date).ToUniversalTime().ToString("r")
+        $stringToHash = "POST`n$($bytes.Length)`napplication/json`nx-ms-date:$date`n/api/logs"
+        $keyBytes = [Convert]::FromBase64String($sharedKey)
+        $hmacsha256 = New-Object System.Security.Cryptography.HMACSHA256
+        $hmacsha256.Key = $keyBytes
+        $signature = [Convert]::ToBase64String($hmacsha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($stringToHash)))
+
+        $authHeader = "SharedKey $workspaceId:$signature"
+        $headers = @{
+            Authorization = $authHeader
+            "Log-Type"    = $logType
+            "x-ms-date"   = $date
+        }
+
+        Invoke-RestMethod -Method Post `
+            -Uri "https://$workspaceId.ods.opinsights.azure.com/api/logs?api-version=2016-04-01" `
+            -Body $body `
+            -Headers $headers `
+            -ContentType "application/json"
+      displayName: "Send Apply Stage Logs to Azure Monitor"
