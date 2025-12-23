@@ -1,46 +1,47 @@
 trigger:
 - none
 
-pool:
-  name: Default
+pool: Default
 
 variables:
   TF_DIR: '$(System.DefaultWorkingDirectory)/env/dev'
 
 stages:
 
-# =====================================================
+# =========================================================
 # BUILD / PRECHECK STAGE
-# =====================================================
+# =========================================================
 - stage: Build
   displayName: "Terraform Precheck"
   jobs:
   - job: precheck
-    displayName: "Terraform Init, Plan & Cost"
+    displayName: "Terraform Init & Plan"
     steps:
 
+    # ---------- Terraform Init ----------
     - task: TerraformTask@5
       displayName: "Terraform Init"
       inputs:
-        provider: azurerm
-        command: init
-        workingDirectory: $(TF_DIR)
-        backendServiceArm: myconnection
-        backendAzureRmResourceGroupName: rg-mahesh-11
-        backendAzureRmStorageAccountName: maheshstg12
-        backendAzureRmContainerName: mahesh
-        backendAzureRmKey: dev.tfstate
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_DIR)'
+        backendServiceArm: 'myconnection'
+        backendAzureRmResourceGroupName: 'rg-mahesh-11'
+        backendAzureRmStorageAccountName: 'maheshstg12'
+        backendAzureRmContainerName: 'mahesh'
+        backendAzureRmKey: 'dev.tfstate'
 
+    # ---------- Terraform Plan ----------
     - task: TerraformTask@5
       displayName: "Terraform Plan"
       inputs:
-        provider: azurerm
-        command: plan
-        workingDirectory: $(TF_DIR)
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(TF_DIR)'
         commandOptions: '-out=tfplan'
-        environmentServiceNameAzureRM: myconnection
+        environmentServiceNameAzureRM: 'myconnection'
 
-    # -------- INFRACOST INSTALL (SAFE - NO ADMIN) --------
+    # ---------- Install Infracost (SAFE WAY) ----------
     - powershell: |
         Write-Host "Installing Infracost safely..."
         $dir = "$(Agent.TempDirectory)\infracost"
@@ -52,11 +53,14 @@ stages:
 
         Expand-Archive "$dir\infracost.zip" -DestinationPath $dir -Force
 
+        # Add to PATH for next steps
         Write-Host "##vso[task.prependpath]$dir"
-        infracost --version
+
+        # Verify using full path
+        & "$dir\infracost.exe" --version
       displayName: "Install Infracost (Windows)"
 
-    # -------- INFRACOST COST ESTIMATION --------
+    # ---------- Infracost Cost Estimation ----------
     - powershell: |
         infracost breakdown `
           --path "$(TF_DIR)" `
@@ -66,36 +70,34 @@ stages:
       env:
         INFRACOST_API_KEY: $(INFRACOST_API_KEY)
 
-# =====================================================
+# =========================================================
 # SECURITY SCANNING STAGE
-# =====================================================
+# =========================================================
 - stage: Scanning
   displayName: "Security Scanning"
   dependsOn: Build
   condition: succeeded()
   jobs:
   - job: tfscan
-    displayName: "tfsec & Trivy Scan"
+    displayName: "Terraform Security Scan"
     steps:
 
     - task: tfsec@1
-      displayName: "Terraform Security Scan"
       inputs:
-        version: v1.26.0
+        version: 'v1.26.0'
 
     - task: trivy@2
-      displayName: "Trivy Filesystem Scan"
       inputs:
         type: filesystem
-        target: $(TF_DIR)
-        severity: HIGH,CRITICAL
-        version: latest
+        target: '$(TF_DIR)'
+        severity: 'HIGH,CRITICAL'
+        version: 'latest'
 
-# =====================================================
+# =========================================================
 # MANUAL APPROVAL STAGE
-# =====================================================
+# =========================================================
 - stage: Approval
-  displayName: "Manual Approval"
+  displayName: "Manual Approval Stage"
   dependsOn: Scanning
   condition: succeeded()
   jobs:
@@ -110,11 +112,11 @@ stages:
           - task: ManualValidation@0
             inputs:
               notifyUsers: 'mahesh1tiwari'
-              instructions: 'Approve Terraform Apply to continue'
+              instructions: 'Please approve Terraform Apply to continue.'
 
-# =====================================================
-# TERRAFORM APPLY STAGE
-# =====================================================
+# =========================================================
+# APPLY STAGE (MAIN BRANCH ONLY)
+# =========================================================
 - stage: TerraformApply
   displayName: "Terraform Apply"
   dependsOn: Approval
@@ -125,22 +127,22 @@ stages:
     steps:
 
     - task: TerraformTask@5
-      displayName: "Terraform Init"
+      displayName: "Terraform Init (Apply)"
       inputs:
-        provider: azurerm
-        command: init
-        workingDirectory: $(TF_DIR)
-        backendServiceArm: myconnection
-        backendAzureRmResourceGroupName: rg-mahesh-11
-        backendAzureRmStorageAccountName: maheshstg12
-        backendAzureRmContainerName: mahesh
-        backendAzureRmKey: dev.tfstate
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_DIR)'
+        backendServiceArm: 'myconnection'
+        backendAzureRmResourceGroupName: 'rg-mahesh-11'
+        backendAzureRmStorageAccountName: 'maheshstg12'
+        backendAzureRmContainerName: 'mahesh'
+        backendAzureRmKey: 'dev.tfstate'
 
     - task: TerraformTask@5
       displayName: "Terraform Apply"
       inputs:
-        provider: azurerm
-        command: apply
-        workingDirectory: $(TF_DIR)
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(TF_DIR)'
         commandOptions: '-auto-approve'
-        environmentServiceNameAzureRM: myconnection
+        environmentServiceNameAzureRM: 'myconnection'
