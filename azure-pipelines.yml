@@ -44,16 +44,21 @@ stages:
         commandOptions: '-out=tfplan'
         environmentServiceNameAzureRM: 'myconnection'
 
-    # ---------- Install Infracost ----------
+    # ---------- Install Infracost (FIXED) ----------
     - powershell: |
         Write-Host "Installing Infracost..."
         $dir = "$(Agent.TempDirectory)\infracost"
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
-        Invoke-WebRequest https://infracost.io/downloads/latest/infracost-windows-amd64.zip -OutFile "$dir\infracost.zip"
+
+        Invoke-WebRequest https://infracost.io/downloads/latest/infracost-windows-amd64.zip `
+          -OutFile "$dir\infracost.zip"
+
         Expand-Archive "$dir\infracost.zip" -DestinationPath $dir -Force
+
         Write-Host "##vso[task.prependpath]$dir"
-        infracost --version
-      displayName: "Install Infracost"
+
+        & "$dir\infracost.exe" --version
+      displayName: "Install Infracost (Windows)"
 
     # ---------- Infracost Cost Estimation ----------
     - powershell: |
@@ -76,18 +81,15 @@ stages:
 
     - checkout: self
 
-    # ---------- Verify Go ----------
     - powershell: |
         go version
       displayName: "Verify Go Installation"
 
-    # ---------- Download Go Modules ----------
     - powershell: |
         cd "$(TERRATEST_DIR)"
         go mod tidy
       displayName: "Install Terratest Dependencies"
 
-    # ---------- Run Terratest ----------
     - powershell: |
         cd "$(TERRATEST_DIR)"
         go test -v -timeout 30m
@@ -108,12 +110,10 @@ stages:
     - checkout: self
 
     - task: tfsec@1
-      displayName: "Run tfsec"
       inputs:
         version: 'v1.26.0'
 
     - task: trivy@2
-      displayName: "Run Trivy"
       inputs:
         type: filesystem
         target: '$(TF_DIR)'
@@ -155,7 +155,6 @@ stages:
 
     - checkout: self
 
-    # ---------- Terraform Init ----------
     - task: TerraformTask@5
       displayName: "Terraform Init (Apply)"
       inputs:
@@ -168,7 +167,6 @@ stages:
         backendAzureRmContainerName: 'mahesh'
         backendAzureRmKey: 'dev.tfstate'
 
-    # ---------- Terraform Apply ----------
     - task: TerraformTask@5
       displayName: "Terraform Apply"
       inputs:
