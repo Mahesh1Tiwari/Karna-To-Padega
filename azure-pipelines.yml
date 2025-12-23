@@ -5,7 +5,7 @@ pool: Default
 
 variables:
   TF_DIR: '$(System.DefaultWorkingDirectory)/env/dev'
-  LOG_TYPE: 'TerraformPipelineLogs'   # Log type in Azure Monitor
+  LOG_TYPE: 'TerraformPipelineLogs'
 
 stages:
 
@@ -19,7 +19,6 @@ stages:
     displayName: "Terraform Init & Plan"
     steps:
 
-    # ---------- Terraform Init ----------
     - task: TerraformTask@5
       displayName: "Terraform Init"
       inputs:
@@ -32,7 +31,6 @@ stages:
         backendAzureRmContainerName: 'mahesh'
         backendAzureRmKey: 'dev.tfstate'
 
-    # ---------- Terraform Plan ----------
     - task: TerraformTask@5
       displayName: "Terraform Plan"
       inputs:
@@ -42,7 +40,6 @@ stages:
         commandOptions: '-out=tfplan'
         environmentServiceNameAzureRM: 'myconnection'
 
-    # ---------- Install Infracost ----------
     - powershell: |
         Write-Host "Installing Infracost..."
         $dir = "$(Agent.TempDirectory)\infracost"
@@ -53,14 +50,12 @@ stages:
         & "$dir\infracost.exe" --version
       displayName: "Install Infracost (Windows)"
 
-    # ---------- Infracost Cost Estimation ----------
     - powershell: |
         infracost breakdown --path "$(TF_DIR)" --format table
       displayName: "Infracost Cost Estimation"
       env:
         INFRACOST_API_KEY: $(INFRACOST_API_KEY)
 
-    # ---------- Send Build Logs to Azure Monitor ----------
     - powershell: |
         $workspaceId = "$(LOG_ANALYTICS_WORKSPACE_ID)"
         $sharedKey = "$(LOG_ANALYTICS_SHARED_KEY)"
@@ -81,8 +76,8 @@ stages:
         $hmacsha256.Key = $keyBytes
         $signature = [Convert]::ToBase64String($hmacsha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($stringToHash)))
 
-        # ✅ Fixed Authorization Header
-        $authHeader = "SharedKey $workspaceId:$signature"
+        # ✅ Fixed colon interpolation
+        $authHeader = "SharedKey ${workspaceId}:${signature}"
         $headers = @{
             Authorization = $authHeader
             "Log-Type"    = $logType
@@ -119,7 +114,6 @@ stages:
         severity: 'HIGH,CRITICAL'
         version: 'latest'
 
-    # ---------- Send Security Scan Logs ----------
     - powershell: |
         $workspaceId = "$(LOG_ANALYTICS_WORKSPACE_ID)"
         $sharedKey = "$(LOG_ANALYTICS_SHARED_KEY)"
@@ -140,7 +134,7 @@ stages:
         $hmacsha256.Key = $keyBytes
         $signature = [Convert]::ToBase64String($hmacsha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($stringToHash)))
 
-        $authHeader = "SharedKey $workspaceId:$signature"
+        $authHeader = "SharedKey ${workspaceId}:${signature}"
         $headers = @{
             Authorization = $authHeader
             "Log-Type"    = $logType
@@ -208,7 +202,6 @@ stages:
         commandOptions: '-auto-approve'
         environmentServiceNameAzureRM: 'myconnection'
 
-    # ---------- Send Apply Logs to Azure Monitor ----------
     - powershell: |
         $workspaceId = "$(LOG_ANALYTICS_WORKSPACE_ID)"
         $sharedKey = "$(LOG_ANALYTICS_SHARED_KEY)"
@@ -229,7 +222,7 @@ stages:
         $hmacsha256.Key = $keyBytes
         $signature = [Convert]::ToBase64String($hmacsha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($stringToHash)))
 
-        $authHeader = "SharedKey $workspaceId:$signature"
+        $authHeader = "SharedKey ${workspaceId}:${signature}"
         $headers = @{
             Authorization = $authHeader
             "Log-Type"    = $logType
