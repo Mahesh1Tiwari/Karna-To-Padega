@@ -82,7 +82,7 @@ stages:
         $signature = [Convert]::ToBase64String($hmacsha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($stringToHash)))
         
         $headers = @{
-            "Authorization" = "SharedKey $workspaceId:$signature"
+            "Authorization" = "SharedKey "${workspaceId}:${signature}""
             "Log-Type" = $logType
             "x-ms-date" = $date
         }
