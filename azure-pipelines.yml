@@ -5,7 +5,7 @@ pool: Default
 
 variables:
   TF_DIR: '$(System.DefaultWorkingDirectory)/env/dev'
-  TERRATEST_DIR: '$(System.DefaultWorkingDirectory)/terratest'
+  TERRATEST_DIR: '$(System.DefaultWorkingDirectory)/module/terratest'
 
 stages:
 
