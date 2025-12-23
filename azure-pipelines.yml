@@ -5,6 +5,7 @@ pool: Default
 
 variables:
   TF_DIR: '$(System.DefaultWorkingDirectory)/env/dev'
+  LOG_TYPE: 'TerraformPipelineLogs'   # Log type in Azure Monitor
 
 stages:
 
@@ -12,7 +13,7 @@ stages:
 # BUILD / PRECHECK STAGE
 # =========================================================
 - stage: Build
-  displayName: "Terraform Precheck"
+  displayName: "Terraform Precheck Cost Estimate and Monitoring"
   jobs:
   - job: precheck
     displayName: "Terraform Init & Plan"
@@ -41,33 +42,53 @@ stages:
         commandOptions: '-out=tfplan'
         environmentServiceNameAzureRM: 'myconnection'
 
-    # ---------- Install Infracost (SAFE WAY) ----------
+    # ---------- Install Infracost ----------
     - powershell: |
-        Write-Host "Installing Infracost safely..."
+        Write-Host "Installing Infracost..."
         $dir = "$(Agent.TempDirectory)\infracost"
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
-
-        Invoke-WebRequest `
-          -Uri https://infracost.io/downloads/latest/infracost-windows-amd64.zip `
-          -OutFile "$dir\infracost.zip"
-
+        Invoke-WebRequest -Uri https://infracost.io/downloads/latest/infracost-windows-amd64.zip -OutFile "$dir\infracost.zip"
         Expand-Archive "$dir\infracost.zip" -DestinationPath $dir -Force
-
-        # Add to PATH for next steps
         Write-Host "##vso[task.prependpath]$dir"
-
-        # Verify using full path
         & "$dir\infracost.exe" --version
       displayName: "Install Infracost (Windows)"
 
     # ---------- Infracost Cost Estimation ----------
     - powershell: |
-        infracost breakdown `
-        --path "$(TF_DIR)" `
-        --format table
+        infracost breakdown --path "$(TF_DIR)" --format table
       displayName: "Infracost Cost Estimation"
       env:
         INFRACOST_API_KEY: $(INFRACOST_API_KEY)
+
+    # ---------- Send Build Logs to Azure Monitor ----------
+    - powershell: |
+        $workspaceId = "$(LOG_ANALYTICS_WORKSPACE_ID)"
+        $sharedKey = "$(LOG_ANALYTICS_SHARED_KEY)"
+        $logType = "$(LOG_TYPE)"
+        
+        $body = @{
+            Stage = "Build"
+            Branch = "$(Build.SourceBranchName)"
+            Status = "$(Agent.JobStatus)"
+            Timestamp = (Get-Date).ToString("o")
+        } | ConvertTo-Json
+        
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+        $date = (Get-Date).ToUniversalTime().ToString("r")
+        $stringToHash = "POST`n$($bytes.Length)`napplication/json`nx-ms-date:$date`n/api/logs"
+        $keyBytes = [Convert]::FromBase64String($sharedKey)
+        $hmacsha256 = New-Object System.Security.Cryptography.HMACSHA256
+        $hmacsha256.Key = $keyBytes
+        $signature = [Convert]::ToBase64String($hmacsha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($stringToHash)))
+        
+        $headers = @{
+            "Authorization" = "SharedKey $workspaceId:$signature"
+            "Log-Type" = $logType
+            "x-ms-date" = $date
+        }
+        
+        Invoke-RestMethod -Method Post -Uri "https://$workspaceId.ods.opinsights.azure.com/api/logs?api-version=2016-04-01" -Body $body -Headers $headers -ContentType "application/json"
+      displayName: "Send Build Stage Logs to Azure Monitor"
 
 # =========================================================
 # SECURITY SCANNING STAGE
@@ -91,6 +112,36 @@ stages:
         target: '$(TF_DIR)'
         severity: 'HIGH,CRITICAL'
         version: 'latest'
+
+    # ---------- Send Security Scan Logs ----------
+    - powershell: |
+        $workspaceId = "$(LOG_ANALYTICS_WORKSPACE_ID)"
+        $sharedKey = "$(LOG_ANALYTICS_SHARED_KEY)"
+        $logType = "$(LOG_TYPE)"
+        
+        $body = @{
+            Stage = "Security Scan"
+            Branch = "$(Build.SourceBranchName)"
+            Status = "$(Agent.JobStatus)"
+            Timestamp = (Get-Date).ToString("o")
+        } | ConvertTo-Json
+        
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+        $date = (Get-Date).ToUniversalTime().ToString("r")
+        $stringToHash = "POST`n$($bytes.Length)`napplication/json`nx-ms-date:$date`n/api/logs"
+        $keyBytes = [Convert]::FromBase64String($sharedKey)
+        $hmacsha256 = New-Object System.Security.Cryptography.HMACSHA256
+        $hmacsha256.Key = $keyBytes
+        $signature = [Convert]::ToBase64String($hmacsha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($stringToHash)))
+        
+        $headers = @{
+            "Authorization" = "SharedKey $workspaceId:$signature"
+            "Log-Type" = $logType
+            "x-ms-date" = $date
+        }
+        
+        Invoke-RestMethod -Method Post -Uri "https://$workspaceId.ods.opinsights.azure.com/api/logs?api-version=2016-04-01" -Body $body -Headers $headers -ContentType "application/json"
+      displayName: "Send Security Scan Logs to Azure Monitor"
 
 # =========================================================
 # MANUAL APPROVAL STAGE
@@ -119,7 +170,7 @@ stages:
 - stage: TerraformApply
   displayName: "Terraform Apply"
   dependsOn: Approval
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
   jobs:
   - job: Apply
     displayName: "Terraform Apply Job"
@@ -145,3 +196,34 @@ stages:
         workingDirectory: '$(TF_DIR)'
         commandOptions: '-auto-approve'
         environmentServiceNameAzureRM: 'myconnection'
+
+    # ---------- Send Apply Logs to Azure Monitor ----------
+    - powershell: |
+        $workspaceId = "$(LOG_ANALYTICS_WORKSPACE_ID)"
+        $sharedKey = "$(LOG_ANALYTICS_SHARED_KEY)"
+        $logType = "$(LOG_TYPE)"
+        
+        $body = @{
+            Stage = "Terraform Apply"
+            Branch = "$(Build.SourceBranchName)"
+            Status = "$(Agent.JobStatus)"
+            Timestamp = (Get-Date).ToString("o")
+        } | ConvertTo-Json
+        
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+        $date = (Get-Date).ToUniversalTime().ToString("r")
+        $stringToHash = "POST`n$($bytes.Length)`napplication/json`nx-ms-date:$date`n/api/logs"
+        $keyBytes = [Convert]::FromBase64String($sharedKey)
+        $hmacsha256 = New-Object System.Security.Cryptography.HMACSHA256
+        $hmacsha256.Key = $keyBytes
+        $signature = [Convert]::ToBase64String($hmacsha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($stringToHash)))
+        
+        $headers = @{
+            "Authorization" = "SharedKey $workspaceId:$signature"
+            "Log-Type" = $logType
+            "x-ms-date" = $date
+        }
+        
+        Invoke-RestMethod -Method Post -Uri "https://$workspaceId.ods.opinsights.azure.com/api/logs?api-version=2016-04-01" -Body $body -Headers $headers -ContentType "application/json"
+      displayName: "Send Apply Stage Logs to Azure Monitor"
+
