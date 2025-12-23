@@ -19,7 +19,6 @@ stages:
         provider: 'azurerm'
         command: 'init'
         workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
-        backendAzureRmUseEntraIdForAuthentication: false
         backendServiceArm: 'myconnection'
         backendAzureRmResourceGroupName: 'rg-mahesh-11'
         backendAzureRmStorageAccountName: 'maheshstg12'
@@ -32,7 +31,24 @@ stages:
         provider: 'azurerm'
         command: 'plan'
         workingDirectory: '$(System.DefaultWorkingDirectory)/env/dev'
+        commandOptions: '-out=tfplan'
         environmentServiceNameAzureRM: 'myconnection'
+
+    # ===== INFRACOST INSTALL =====
+    - script: |
+        curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+        infracost --version
+      displayName: "Install Infracost"
+
+    # ===== INFRACOST COST ESTIMATION =====
+    - script: |
+        infracost breakdown \
+          --path $(System.DefaultWorkingDirectory)/env/dev \
+          --terraform-plan-file $(System.DefaultWorkingDirectory)/env/dev/tfplan \
+          --format table
+      displayName: "Infracost Cost Estimation"
+      env:
+        INFRACOST_API_KEY: $(INFRACOST_API_KEY)
 
 
 # ================= SCANNING STAGE =================
