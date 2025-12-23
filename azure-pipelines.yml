@@ -63,9 +63,8 @@ stages:
     # ---------- Infracost Cost Estimation ----------
     - powershell: |
         infracost breakdown `
-          --path "$(TF_DIR)" `
-          --terraform-plan-file "$(TF_DIR)\tfplan" `
-          --format table
+        --path "$(TF_DIR)" `
+        --format table
       displayName: "Infracost Cost Estimation"
       env:
         INFRACOST_API_KEY: $(INFRACOST_API_KEY)
