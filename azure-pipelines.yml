@@ -86,7 +86,7 @@ stages:
       displayName: "Verify Go Installation"
 
     - powershell: |
-        cd "$(TERRATEST_DIR)"
+        cd "$(System.DefaultWorkingDirectory)\module\terratest"
         go mod tidy
       displayName: "Install Terratest Dependencies"
 
