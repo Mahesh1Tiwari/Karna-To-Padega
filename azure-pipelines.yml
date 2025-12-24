@@ -85,7 +85,7 @@ stages:
       inputs:
         version: '1.10'
     - powershell: |
-        cd "$(System.DefaultWorkingDirectory)\module\terratest"
+        cd "$(Build.SourcesDirectory)/module/terratest"
         go mod tidy
       displayName: "Install Terratest Dependencies"
 
