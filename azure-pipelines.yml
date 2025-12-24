@@ -4,13 +4,14 @@ trigger:
 pool: Default
 
 variables:
-  TF_DIR: '$(Build.SourcesDirectory)/env/dev'
-  TERRATEST_DIR: '$(Build.SourcesDirectory)/module/terratest'
+  TF_DIR: '$(System.DefaultWorkingDirectory)/env/dev'
+  TERRATEST_DIR: '$(System.DefaultWorkingDirectory)/module/terratest'
+
+stages:
 
 # =========================================================
 # BUILD / PRECHECK STAGE
 # =========================================================
-stages:
 - stage: Build
   displayName: "Terraform Precheck"
   jobs:
@@ -24,45 +25,45 @@ stages:
     - task: TerraformTask@5
       displayName: "Terraform Init"
       inputs:
-        provider: azurerm
-        command: init
-        workingDirectory: $(TF_DIR)
-        backendServiceArm: myconnection
-        backendAzureRmResourceGroupName: rg-mahesh-11
-        backendAzureRmStorageAccountName: maheshstg12
-        backendAzureRmContainerName: mahesh
-        backendAzureRmKey: dev.tfstate
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_DIR)'
+        backendServiceArm: 'myconnection'
+        backendAzureRmResourceGroupName: 'rg-mahesh-11'
+        backendAzureRmStorageAccountName: 'maheshstg12'
+        backendAzureRmContainerName: 'mahesh'
+        backendAzureRmKey: 'dev.tfstate'
 
     # ---------- Terraform Plan ----------
     - task: TerraformTask@5
       displayName: "Terraform Plan"
       inputs:
-        provider: azurerm
-        command: plan
-        workingDirectory: $(TF_DIR)
-        commandOptions: "-out=tfplan"
-        environmentServiceNameAzureRM: myconnection
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(TF_DIR)'
+        commandOptions: '-out=tfplan'
+        environmentServiceNameAzureRM: 'myconnection'
 
     # ---------- Install Infracost ----------
-    - task: PowerShell@2
-      displayName: "Install Infracost"
-      inputs:
-        targetType: inline
-        script: |
-          $dir = "$(Agent.TempDirectory)\infracost"
-          New-Item -ItemType Directory -Force -Path $dir | Out-Null
-          Invoke-WebRequest https://infracost.io/downloads/latest/infracost-windows-amd64.zip -OutFile "$dir\infracost.zip"
-          Expand-Archive "$dir\infracost.zip" -DestinationPath $dir -Force
-          Write-Host "##vso[task.prependpath]$dir"
-          infracost --version
+    - powershell: |
+        Write-Host "Installing Infracost..."
+        $dir = "$(Agent.TempDirectory)\infracost"
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
 
-    # ---------- Infracost Breakdown ----------
-    - task: PowerShell@2
+        Invoke-WebRequest https://infracost.io/downloads/latest/infracost-windows-amd64.zip `
+          -OutFile "$dir\infracost.zip"
+
+        Expand-Archive "$dir\infracost.zip" -DestinationPath $dir -Force
+
+        Write-Host "##vso[task.prependpath]$dir"
+
+        & "$dir\infracost.exe" --version
+      displayName: "Install Infracost (Windows)"
+
+    # ---------- Infracost Cost Estimation ----------
+    - powershell: |
+        infracost breakdown --path "$(TF_DIR)" --format table
       displayName: "Infracost Cost Estimation"
-      inputs:
-        targetType: inline
-        script: |
-          infracost breakdown --path "$(TF_DIR)" --format table
       env:
         INFRACOST_API_KEY: $(INFRACOST_API_KEY)
 
@@ -70,7 +71,7 @@ stages:
 # TERRATEST STAGE
 # =========================================================
 - stage: Terratest
-  displayName: "Terratest Validation"
+  displayName: "Terraform Tests (Terratest)"
   dependsOn: Build
   condition: succeeded()
   jobs:
@@ -80,44 +81,19 @@ stages:
 
     - checkout: self
 
-    # ---------- DEBUG (VERY IMPORTANT) ----------
-    - task: PowerShell@2
-      displayName: "Debug Repo Structure"
-      inputs:
-        targetType: inline
-        script: |
-          echo "Sources Directory:"
-          echo $(Build.SourcesDirectory)
-          dir $(Build.SourcesDirectory)
-          dir $(Build.SourcesDirectory)\module
-
-    # ---------- Install Go ----------
     - task: GoTool@0
-      displayName: "Install Go"
-      inputs:
-        version: '1.21'
-
-    # ---------- Install Terratest Dependencies ----------
-    - task: PowerShell@2
-      displayName: "Install Terratest Dependencies"
+      displayName: "DEBUG – Verify Terratest Path"
       inputs:
         targetType: inline
         script: |
-          if (!(Test-Path "$(TERRATEST_DIR)")) {
-            Write-Error "Terratest directory not found"
-            exit 1
-          }
-          cd "$(TERRATEST_DIR)"
-          go mod tidy
+          echo "Build.SourcesDirectory:"
+          echo $(Build.SourcesDirectory)
 
-    # ---------- Run Terratest ----------
-    - task: PowerShell@2
-      displayName: "Run Terratest"
-      inputs:
-        targetType: inline
-        script: |
-          cd "$(TERRATEST_DIR)"
-          go test -v -timeout 30m
+          echo "Root folders:"
+          dir $(Build.SourcesDirectory)
+
+          echo "Module folders:"
+          dir $(Build.SourcesDirectory)\module
 
 # =========================================================
 # SECURITY SCANNING STAGE
@@ -127,35 +103,33 @@ stages:
   dependsOn: Terratest
   condition: succeeded()
   jobs:
-  - job: scan
-    displayName: "tfsec & trivy"
+  - job: tfscan
+    displayName: "Terraform Security Scan"
     steps:
 
     - checkout: self
 
     - task: tfsec@1
-      displayName: "Run tfsec"
       inputs:
-        version: v1.26.0
+        version: 'v1.26.0'
 
     - task: trivy@2
-      displayName: "Run Trivy"
       inputs:
         type: filesystem
-        target: $(TF_DIR)
-        severity: HIGH,CRITICAL
-        version: latest
+        target: '$(TF_DIR)'
+        severity: 'HIGH,CRITICAL'
+        version: 'latest'
 
 # =========================================================
-# MANUAL APPROVAL
+# MANUAL APPROVAL STAGE
 # =========================================================
 - stage: Approval
-  displayName: "Manual Approval"
+  displayName: "Manual Approval Stage"
   dependsOn: Scanning
   condition: succeeded()
   jobs:
-  - deployment: Approval
-    displayName: "Approval Required"
+  - deployment: ManualApproval
+    displayName: "Wait for Approval"
     environment: dev
     pool: server
     strategy:
@@ -164,19 +138,19 @@ stages:
           steps:
           - task: ManualValidation@0
             inputs:
-              notifyUsers: mahesh1tiwari
-              instructions: "Approve to run Terraform Apply"
+              notifyUsers: 'mahesh1tiwari'
+              instructions: 'Please approve Terraform Apply to continue.'
 
 # =========================================================
-# APPLY (MAIN BRANCH ONLY)
+# APPLY STAGE (MAIN BRANCH ONLY)
 # =========================================================
-- stage: Apply
+- stage: TerraformApply
   displayName: "Terraform Apply"
   dependsOn: Approval
   condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
   jobs:
-  - job: apply
-    displayName: "Terraform Apply"
+  - job: Apply
+    displayName: "Terraform Apply Job"
     steps:
 
     - checkout: self
@@ -184,20 +158,20 @@ stages:
     - task: TerraformTask@5
       displayName: "Terraform Init (Apply)"
       inputs:
-        provider: azurerm
-        command: init
-        workingDirectory: $(TF_DIR)
-        backendServiceArm: myconnection
-        backendAzureRmResourceGroupName: rg-mahesh-11
-        backendAzureRmStorageAccountName: maheshstg12
-        backendAzureRmContainerName: mahesh
-        backendAzureRmKey: dev.tfstate
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(TF_DIR)'
+        backendServiceArm: 'myconnection'
+        backendAzureRmResourceGroupName: 'rg-mahesh-11'
+        backendAzureRmStorageAccountName: 'maheshstg12'
+        backendAzureRmContainerName: 'mahesh'
+        backendAzureRmKey: 'dev.tfstate'
 
     - task: TerraformTask@5
       displayName: "Terraform Apply"
       inputs:
-        provider: azurerm
-        command: apply
-        workingDirectory: $(TF_DIR)
-        commandOptions: "-auto-approve"
-        environmentServiceNameAzureRM: myconnection
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: '$(TF_DIR)'
+        commandOptions: '-auto-approve'
+        environmentServiceNameAzureRM: 'myconnection'
